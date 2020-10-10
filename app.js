@@ -97,6 +97,19 @@ io.on('connection', async socket => {
     }))
   })
 
+  let users
+  await User.findAll().then(results => {
+    // console.log(results[0].dataValues)
+    users = results.map(item => ({
+      ...item.dataValues,
+      account: item.dataValues.account,
+      name: item.dataValues.name,
+      avatar: item.dataValues.avatar,
+    }))
+  })
+
+
+
   // emit history message to user
   socket.emit('history', historyMessages)
 
@@ -111,6 +124,13 @@ io.on('connection', async socket => {
     io.emit("message", 'data')
   })
 
+  socket.on("connected", users => {
+    console.log('send user')
+    console.log('users:', users)
+
+    io.emit("connected", users)
+  })
+
   socket.on('disconnect', function () {
     console.log('a user go out')
     socket.broadcast.emit('message', `${loginUser.loginName} 離線`)
@@ -118,6 +138,23 @@ io.on('connection', async socket => {
     // delete user date in online user list
     onlineUsers = onlineUsers.filter(user => user.loginID !== loginUser.loginID)
     socket.broadcast.emit('onlineUsers', onlineUsers)
+  })
+
+  // 接收 chat 發出的訊息
+  socket.on('chat', async msg => {
+    // console.log('測試能否抓到 chat 的訊息內容:', msg)
+    // let receiverMessage
+    await Message.create({
+      UserId: loginUser.loginID,
+      text: msg
+    }).then((messages => {
+      receiverMessage = {
+        text: messages.dataValues.text,
+        avatar: loginUser.loginAvatar,
+        time: moment(messages.dataValues.createdAt).format('LLL')
+      }
+    }))
+    socket.broadcast.emit('chat', receiverMessage)
   })
 })
 
